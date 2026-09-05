@@ -1,17 +1,24 @@
 package com.goovat.poweralarm
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.BatteryManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        requestNotificationPermission()
 
         val batteryMonitor = BatteryMonitor(this)
         val powerMonitor = PowerMonitor(this)
@@ -51,19 +58,60 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             """.trimIndent()
+
             textSize = 20f
             setPadding(0, 32, 0, 32)
         })
 
         root.addView(Button(this).apply {
+            text = "Start Monitoring"
+
+            setOnClickListener {
+                val intent = Intent(
+                    this@MainActivity,
+                    AlarmService::class.java
+                )
+
+                ContextCompat.startForegroundService(
+                    this@MainActivity,
+                    intent
+                )
+            }
+        })
+
+        root.addView(Button(this).apply {
             text = "Settings"
+
             setOnClickListener {
                 startActivity(
-                    Intent(this@MainActivity, SettingsActivity::class.java)
+                    Intent(
+                        this@MainActivity,
+                        SettingsActivity::class.java
+                    )
                 )
             }
         })
 
         setContentView(root)
+    }
+
+    private fun requestNotificationPermission() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                NOTIFICATION_PERMISSION_REQUEST
+            )
+        }
+    }
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST = 2001
     }
 }
