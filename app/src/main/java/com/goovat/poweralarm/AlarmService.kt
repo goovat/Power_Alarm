@@ -16,6 +16,7 @@ class AlarmService : Service() {
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var settingsStore: AlarmSettingsStore
     private lateinit var eventEvaluator: AlarmEventEvaluator
+    private lateinit var alarmEngine: AlarmEngine
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -36,6 +37,7 @@ class AlarmService : Service() {
         batteryMonitor = BatteryMonitor(this)
         settingsStore = AlarmSettingsStore(this)
         eventEvaluator = AlarmEventEvaluator()
+        alarmEngine = AlarmEngine(this)
 
         createNotificationChannel()
 
@@ -87,8 +89,7 @@ class AlarmService : Service() {
     private fun handleEvent(event: AlarmEvent) {
         Log.i(TAG, "Alarm event detected: $event")
 
-        // Actual alarm behavior will be connected here
-        // in the next increment.
+        alarmEngine.trigger(event)
     }
 
     private fun updateNotification(
@@ -141,6 +142,7 @@ class AlarmService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(monitorRunnable)
+        alarmEngine.release()
         super.onDestroy()
     }
 
