@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -19,4 +20,9 @@ android {
             isMinifyEnabled = false
         }
     }
+}
+
+
+dependencies {
+    implementation("androidx.activity:activity-ktx:1.10.1")
 }
