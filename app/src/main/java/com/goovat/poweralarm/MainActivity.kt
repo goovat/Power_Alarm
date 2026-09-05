@@ -1,7 +1,10 @@
 package com.goovat.poweralarm
 
+import android.content.Intent
 import android.os.Bundle
 import android.os.BatteryManager
+import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 
@@ -24,26 +27,43 @@ class MainActivity : ComponentActivity() {
             else -> "Unknown"
         }
 
-        val powerText = when {
-            power.plugType != 0 -> "External power connected"
-            else -> "External power disconnected"
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
         }
 
-        val view = TextView(this).apply {
-            text = """
-                Power Alarm
+        root.addView(TextView(this).apply {
+            text = "Power Alarm"
+            textSize = 28f
+        })
 
+        root.addView(TextView(this).apply {
+            text = """
                 Battery: ${battery.percentage}%
                 Status: $chargingText
                 Temperature: ${battery.temperatureCelsius}°C
 
-                Power: $powerText
+                Power: ${
+                    if (power.isExternalPowerConnected) {
+                        "External power connected"
+                    } else {
+                        "External power disconnected"
+                    }
+                }
             """.trimIndent()
+            textSize = 20f
+            setPadding(0, 32, 0, 32)
+        })
 
-            textSize = 22f
-            setPadding(48, 48, 48, 48)
-        }
+        root.addView(Button(this).apply {
+            text = "Settings"
+            setOnClickListener {
+                startActivity(
+                    Intent(this@MainActivity, SettingsActivity::class.java)
+                )
+            }
+        })
 
-        setContentView(view)
+        setContentView(root)
     }
 }
