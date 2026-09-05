@@ -35,12 +35,8 @@ class AlarmActivity : FragmentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent?) {
+    override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
-
-        if (intent == null) {
-            return
-        }
 
         val newToken = intent.getStringExtra(
             AlarmService.EXTRA_ALARM_SESSION_TOKEN
