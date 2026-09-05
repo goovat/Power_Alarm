@@ -24,4 +24,5 @@ android {
 
 dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
 }

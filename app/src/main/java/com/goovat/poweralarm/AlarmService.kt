@@ -3,7 +3,9 @@ package com.goovat.poweralarm
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.IBinder
@@ -39,11 +41,11 @@ class AlarmService : Service() {
         eventEvaluator = AlarmEventEvaluator()
         alarmEngine = AlarmEngine(this)
 
-        createNotificationChannel()
+        createNotificationChannels()
 
         startForeground(
             NOTIFICATION_ID,
-            buildNotification("Monitoring power and battery")
+            buildMonitoringNotification("Monitoring power and battery")
         )
 
         previousPower = powerMonitor.getCurrentState()
@@ -83,53 +85,173 @@ class AlarmService : Service() {
         previousPower = currentPower
         previousBattery = currentBattery
 
-        updateNotification(currentBattery, currentPower)
+        updateMonitoringNotification(
+            currentBattery,
+            currentPower
+        )
     }
 
     private fun handleEvent(event: AlarmEvent) {
         Log.i(TAG, "Alarm event detected: $event")
 
+        val wasActive = alarmEngine.isActive
+
         alarmEngine.trigger(event)
+
+        if (!wasActive && alarmEngine.isActive) {
+            showAlarmNotification(event)
+        }
     }
 
-    private fun updateNotification(
+    private fun updateMonitoringNotification(
         battery: BatterySnapshot,
         power: PowerSnapshot
     ) {
+        if (alarmEngine.isActive) {
+            return
+        }
+
         val powerText = if (power.isExternalPowerConnected) {
             "Power connected"
         } else {
             "Power disconnected"
         }
 
-        val notification = buildNotification(
+        val notification = buildMonitoringNotification(
             "$powerText • Battery ${battery.percentage}%"
         )
 
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
+        val manager = getSystemService(
+            NotificationManager::class.java
+        )
+
+        manager.notify(
+            NOTIFICATION_ID,
+            notification
+        )
     }
 
-    private fun buildNotification(content: String): Notification {
-        return Notification.Builder(this, CHANNEL_ID)
+    private fun showAlarmNotification(event: AlarmEvent) {
+        val intent = Intent(
+            this,
+            AlarmActivity::class.java
+        ).apply {
+            flags =
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            ALARM_REQUEST_CODE,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = Notification.Builder(
+            this,
+            ALARM_CHANNEL_ID
+        )
+            .setContentTitle("Power Alarm")
+            .setContentText(eventDescription(event))
+            .setSmallIcon(
+                android.R.drawable.ic_lock_idle_charging
+            )
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setPriority(Notification.PRIORITY_MAX)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setFullScreenIntent(
+                pendingIntent,
+                true
+            )
+            .build()
+
+        val manager = getSystemService(
+            NotificationManager::class.java
+        )
+
+        manager.notify(
+            ALARM_NOTIFICATION_ID,
+            notification
+        )
+    }
+
+    private fun eventDescription(event: AlarmEvent): String {
+        return when (event) {
+            AlarmEvent.PowerOff ->
+                "External power disconnected"
+
+            AlarmEvent.PowerRestored ->
+                "External power restored"
+
+            AlarmEvent.ChargingStarted ->
+                "Charging started"
+
+            AlarmEvent.ChargingStopped ->
+                "Charging stopped"
+
+            is AlarmEvent.LowBattery ->
+                "Battery low: ${event.percentage}%"
+
+            is AlarmEvent.CriticalBattery ->
+                "Battery critical: ${event.percentage}%"
+
+            is AlarmEvent.FullBattery ->
+                "Battery full: ${event.percentage}%"
+        }
+    }
+
+    private fun buildMonitoringNotification(
+        content: String
+    ): Notification {
+        return Notification.Builder(
+            this,
+            CHANNEL_ID
+        )
             .setContentTitle("Power Alarm")
             .setContentText(content)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
+            .setSmallIcon(
+                android.R.drawable.ic_lock_idle_charging
+            )
             .setOngoing(true)
             .build()
     }
 
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
+    private fun createNotificationChannels() {
+        val monitoringChannel = NotificationChannel(
             CHANNEL_ID,
             "Power monitoring",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Power Alarm background monitoring"
+            description =
+                "Power Alarm background monitoring"
         }
 
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
+        val alarmChannel = NotificationChannel(
+            ALARM_CHANNEL_ID,
+            "Power alarms",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description =
+                "Critical Power Alarm alerts"
+            setBypassDnd(true)
+            enableVibration(true)
+        }
+
+        val manager = getSystemService(
+            NotificationManager::class.java
+        )
+
+        manager.createNotificationChannel(
+            monitoringChannel
+        )
+
+        manager.createNotificationChannel(
+            alarmChannel
+        )
     }
 
     override fun onStartCommand(
@@ -137,12 +259,29 @@ class AlarmService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+        if (intent?.action == ACTION_STOP_ALARM) {
+            alarmEngine.release()
+
+            val manager = getSystemService(
+                NotificationManager::class.java
+            )
+
+            manager.cancel(ALARM_NOTIFICATION_ID)
+        }
+
         return START_STICKY
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(monitorRunnable)
         alarmEngine.release()
+
+        val manager = getSystemService(
+            NotificationManager::class.java
+        )
+
+        manager.cancel(ALARM_NOTIFICATION_ID)
+
         super.onDestroy()
     }
 
@@ -152,8 +291,37 @@ class AlarmService : Service() {
 
     companion object {
         private const val TAG = "PowerAlarm"
-        private const val CHANNEL_ID = "power_monitoring"
-        private const val NOTIFICATION_ID = 1001
-        private const val MONITOR_INTERVAL_MS = 5_000L
+
+        private const val CHANNEL_ID =
+            "power_monitoring"
+
+        private const val ALARM_CHANNEL_ID =
+            "power_alarm"
+
+        private const val NOTIFICATION_ID =
+            1001
+
+        private const val ALARM_NOTIFICATION_ID =
+            1002
+
+        private const val ALARM_REQUEST_CODE =
+            2002
+
+        private const val MONITOR_INTERVAL_MS =
+            5_000L
+
+        private const val ACTION_STOP_ALARM =
+            "com.goovat.poweralarm.action.STOP_ALARM"
+
+        fun stopAlarm(context: Context) {
+            val intent = Intent(
+                context,
+                AlarmService::class.java
+            ).apply {
+                action = ACTION_STOP_ALARM
+            }
+
+            context.startService(intent)
+        }
     }
 }
