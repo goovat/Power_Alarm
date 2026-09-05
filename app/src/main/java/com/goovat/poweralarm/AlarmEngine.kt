@@ -63,7 +63,7 @@ class AlarmEngine(
             manager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE)
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
 
         val pattern = longArrayOf(

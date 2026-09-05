@@ -2,12 +2,12 @@ package com.goovat.poweralarm
 
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 
-class AlarmActivity : ComponentActivity() {
+class AlarmActivity : FragmentActivity() {
 
     private var authenticationStarted = false
 
