@@ -9,10 +9,16 @@ import androidx.core.content.ContextCompat
 
 class AlarmActivity : FragmentActivity() {
 
+    private var alarmSessionToken: String? = null
+
     private var authenticationStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        alarmSessionToken = intent.getStringExtra(
+            AlarmService.EXTRA_ALARM_SESSION_TOKEN
+        )
 
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -96,7 +102,14 @@ class AlarmActivity : FragmentActivity() {
     }
 
     private fun stopAlarm() {
-        AlarmService.stopAlarm(this)
+        val sessionToken = alarmSessionToken
+            ?: return
+
+        AlarmService.stopAlarm(
+            this,
+            sessionToken
+        )
+
         finishAndRemoveTask()
     }
 

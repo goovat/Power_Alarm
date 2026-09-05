@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
+import java.util.UUID
 
 class AlarmService : Service() {
 
@@ -24,6 +25,8 @@ class AlarmService : Service() {
 
     private var previousPower: PowerSnapshot? = null
     private var previousBattery: BatterySnapshot? = null
+
+    private var activeAlarmSessionToken: String? = null
 
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -99,6 +102,7 @@ class AlarmService : Service() {
         alarmEngine.trigger(event)
 
         if (!wasActive && alarmEngine.isActive) {
+            activeAlarmSessionToken = UUID.randomUUID().toString()
             showAlarmNotification(event)
         }
     }
@@ -132,6 +136,9 @@ class AlarmService : Service() {
     }
 
     private fun showAlarmNotification(event: AlarmEvent) {
+        val sessionToken = activeAlarmSessionToken
+            ?: return
+
         val intent = Intent(
             this,
             AlarmActivity::class.java
@@ -140,6 +147,11 @@ class AlarmService : Service() {
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+            putExtra(
+                EXTRA_ALARM_SESSION_TOKEN,
+                sessionToken
+            )
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -260,7 +272,24 @@ class AlarmService : Service() {
         startId: Int
     ): Int {
         if (intent?.action == ACTION_STOP_ALARM) {
+            val suppliedToken =
+                intent.getStringExtra(EXTRA_ALARM_SESSION_TOKEN)
+
+            if (
+                suppliedToken == null ||
+                suppliedToken != activeAlarmSessionToken ||
+                !alarmEngine.isActive
+            ) {
+                Log.w(
+                    TAG,
+                    "Rejected unauthorized alarm stop request"
+                )
+
+                return START_STICKY
+            }
+
             alarmEngine.release()
+            activeAlarmSessionToken = null
 
             val manager = getSystemService(
                 NotificationManager::class.java
@@ -275,6 +304,7 @@ class AlarmService : Service() {
     override fun onDestroy() {
         handler.removeCallbacks(monitorRunnable)
         alarmEngine.release()
+        activeAlarmSessionToken = null
 
         val manager = getSystemService(
             NotificationManager::class.java
@@ -313,12 +343,23 @@ class AlarmService : Service() {
         private const val ACTION_STOP_ALARM =
             "com.goovat.poweralarm.action.STOP_ALARM"
 
-        fun stopAlarm(context: Context) {
+        const val EXTRA_ALARM_SESSION_TOKEN =
+            "com.goovat.poweralarm.extra.ALARM_SESSION_TOKEN"
+
+        fun stopAlarm(
+            context: Context,
+            sessionToken: String
+        ) {
             val intent = Intent(
                 context,
                 AlarmService::class.java
             ).apply {
                 action = ACTION_STOP_ALARM
+
+                putExtra(
+                    EXTRA_ALARM_SESSION_TOKEN,
+                    sessionToken
+                )
             }
 
             context.startService(intent)
