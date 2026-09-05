@@ -2,15 +2,14 @@ package com.goovat.poweralarm
 
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 
 class AlarmActivity : FragmentActivity() {
 
     private var alarmSessionToken: String? = null
-
     private var authenticationStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,8 +22,33 @@ class AlarmActivity : FragmentActivity() {
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
+    }
 
-        authenticate()
+    override fun onStart() {
+        super.onStart()
+
+        if (
+            alarmSessionToken != null &&
+            !authenticationStarted
+        ) {
+            authenticate()
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+
+        if (intent == null) {
+            return
+        }
+
+        val newToken = intent.getStringExtra(
+            AlarmService.EXTRA_ALARM_SESSION_TOKEN
+        )
+
+        if (newToken != null) {
+            alarmSessionToken = newToken
+        }
     }
 
     private fun authenticate() {
@@ -71,16 +95,12 @@ class AlarmActivity : FragmentActivity() {
                         errString
                     )
 
-                    // Authentication was cancelled, rejected,
-                    // or unavailable. The alarm remains active.
                     authenticationStarted = false
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
 
-                    // A biometric was presented but did not match.
-                    // The alarm remains active.
                     authenticationStarted = false
                 }
             }
@@ -114,7 +134,6 @@ class AlarmActivity : FragmentActivity() {
     }
 
     override fun onBackPressed() {
-        // Back must never silence the alarm.
         moveTaskToBack(true)
     }
 }
