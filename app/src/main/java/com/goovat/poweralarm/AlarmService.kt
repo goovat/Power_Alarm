@@ -5,14 +5,17 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
-import android.os.IBinder
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 
 class AlarmService : Service() {
 
     private lateinit var powerMonitor: PowerMonitor
     private lateinit var batteryMonitor: BatteryMonitor
+    private lateinit var settingsStore: AlarmSettingsStore
+    private lateinit var eventEvaluator: AlarmEventEvaluator
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -31,8 +34,11 @@ class AlarmService : Service() {
 
         powerMonitor = PowerMonitor(this)
         batteryMonitor = BatteryMonitor(this)
+        settingsStore = AlarmSettingsStore(this)
+        eventEvaluator = AlarmEventEvaluator()
 
         createNotificationChannel()
+
         startForeground(
             NOTIFICATION_ID,
             buildNotification("Monitoring power and battery")
@@ -47,33 +53,29 @@ class AlarmService : Service() {
     private fun checkState() {
         val currentPower = powerMonitor.getCurrentState()
         val currentBattery = batteryMonitor.getCurrentState()
+        val settings = settingsStore.load()
 
         val oldPower = previousPower
         val oldBattery = previousBattery
 
         if (oldPower != null) {
-            val powerChanged =
-                oldPower.isExternalPowerConnected !=
-                    currentPower.isExternalPowerConnected
+            val events = eventEvaluator.evaluatePowerEvents(
+                previous = oldPower,
+                current = currentPower,
+                settings = settings
+            )
 
-            val chargingChanged =
-                oldPower.isCharging != currentPower.isCharging
-
-            if (powerChanged || chargingChanged) {
-                handlePowerTransition(
-                    oldPower,
-                    currentPower
-                )
-            }
+            events.forEach(::handleEvent)
         }
 
         if (oldBattery != null) {
-            if (oldBattery.percentage != currentBattery.percentage) {
-                handleBatteryChange(
-                    oldBattery,
-                    currentBattery
-                )
-            }
+            val events = eventEvaluator.evaluateBatteryEvents(
+                previous = oldBattery,
+                current = currentBattery,
+                settings = settings
+            )
+
+            events.forEach(::handleEvent)
         }
 
         previousPower = currentPower
@@ -82,19 +84,11 @@ class AlarmService : Service() {
         updateNotification(currentBattery, currentPower)
     }
 
-    private fun handlePowerTransition(
-        previous: PowerSnapshot,
-        current: PowerSnapshot
-    ) {
-        // Alarm behavior will be added in the next increment.
-        // This increment only establishes reliable state-transition detection.
-    }
+    private fun handleEvent(event: AlarmEvent) {
+        Log.i(TAG, "Alarm event detected: $event")
 
-    private fun handleBatteryChange(
-        previous: BatterySnapshot,
-        current: BatterySnapshot
-    ) {
-        // Battery threshold/alarm behavior will be added later.
+        // Actual alarm behavior will be connected here
+        // in the next increment.
     }
 
     private fun updateNotification(
@@ -155,6 +149,7 @@ class AlarmService : Service() {
     }
 
     companion object {
+        private const val TAG = "PowerAlarm"
         private const val CHANNEL_ID = "power_monitoring"
         private const val NOTIFICATION_ID = 1001
         private const val MONITOR_INTERVAL_MS = 5_000L
