@@ -1,5 +1,6 @@
 package com.goovat.poweralarm
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.biometric.BiometricManager
@@ -11,6 +12,8 @@ class AlarmActivity : FragmentActivity() {
 
     private var alarmSessionToken: String? = null
     private var authenticationStarted = false
+    private var authenticationCompleted = false
+    private var biometricPrompt: BiometricPrompt? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,54 +25,36 @@ class AlarmActivity : FragmentActivity() {
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
+
+        createBiometricPrompt()
     }
 
     override fun onStart() {
         super.onStart()
 
-        if (
-            alarmSessionToken != null &&
-            !authenticationStarted
-        ) {
+        if (!authenticationStarted && !authenticationCompleted) {
             authenticate()
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
         val newToken = intent.getStringExtra(
             AlarmService.EXTRA_ALARM_SESSION_TOKEN
         )
 
-        if (newToken != null) {
+        if (newToken != null && newToken != alarmSessionToken) {
             alarmSessionToken = newToken
+            authenticationStarted = false
+            authenticationCompleted = false
         }
     }
 
-    private fun authenticate() {
-        if (authenticationStarted) {
-            return
-        }
-
-        authenticationStarted = true
-
-        val authenticators =
-            BiometricManager.Authenticators.BIOMETRIC_STRONG
-
-        val biometricManager = BiometricManager.from(this)
-
-        if (
-            biometricManager.canAuthenticate(authenticators) !=
-            BiometricManager.BIOMETRIC_SUCCESS
-        ) {
-            authenticationStarted = false
-            return
-        }
-
+    private fun createBiometricPrompt() {
         val executor = ContextCompat.getMainExecutor(this)
 
-        val prompt = BiometricPrompt(
+        biometricPrompt = BiometricPrompt(
             this,
             executor,
             object : BiometricPrompt.AuthenticationCallback() {
@@ -79,6 +64,8 @@ class AlarmActivity : FragmentActivity() {
                 ) {
                     super.onAuthenticationSucceeded(result)
 
+                    authenticationStarted = false
+                    authenticationCompleted = true
                     stopAlarm()
                 }
 
@@ -96,11 +83,32 @@ class AlarmActivity : FragmentActivity() {
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-
-                    authenticationStarted = false
                 }
             }
         )
+    }
+
+    private fun authenticate() {
+        if (authenticationStarted || authenticationCompleted) {
+            return
+        }
+
+        val authenticators =
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+
+        val biometricManager = BiometricManager.from(this)
+
+        if (
+            biometricManager.canAuthenticate(authenticators) !=
+            BiometricManager.BIOMETRIC_SUCCESS
+        ) {
+            return
+        }
+
+        val prompt = biometricPrompt
+            ?: return
+
+        authenticationStarted = true
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Power Alarm")
