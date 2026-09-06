@@ -15,11 +15,28 @@ import androidx.activity.ComponentActivity
 class SettingsActivity : ComponentActivity() {
 
     private lateinit var settingsStore: AlarmSettingsStore
-    private var selectedAlarmSoundUri: String? = null
-    private lateinit var alarmSoundButton: Button
+
+    private var selectedBatteryAlertSoundUri: String? = null
+    private var selectedPowerSupplyAlertSoundUri: String? = null
+    private var selectedPowerOffLockedSoundUri: String? = null
+    private var selectedPowerOffUnlockedSoundUri: String? = null
+
+    private lateinit var batterySoundButton: Button
+    private lateinit var powerSupplySoundButton: Button
+    private lateinit var powerOffLockedSoundButton: Button
+    private lateinit var powerOffUnlockedSoundButton: Button
+
+    private var pendingSoundSelection: SoundSelection? = null
 
     companion object {
-        private const val REQUEST_ALARM_SOUND = 3001
+        private const val REQUEST_SOUND = 3001
+    }
+
+    private enum class SoundSelection {
+        BATTERY,
+        POWER_SUPPLY,
+        POWER_OFF_LOCKED,
+        POWER_OFF_UNLOCKED
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +45,17 @@ class SettingsActivity : ComponentActivity() {
         settingsStore = AlarmSettingsStore(this)
         val settings = settingsStore.load()
 
-        selectedAlarmSoundUri = settings.alarmSoundUri
+        selectedBatteryAlertSoundUri =
+            settings.batteryAlertSoundUri
+
+        selectedPowerSupplyAlertSoundUri =
+            settings.powerSupplyAlertSoundUri
+
+        selectedPowerOffLockedSoundUri =
+            settings.powerOffLockedSoundUri
+
+        selectedPowerOffUnlockedSoundUri =
+            settings.powerOffUnlockedSoundUri
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -42,7 +69,11 @@ class SettingsActivity : ComponentActivity() {
 
         root.addView(sectionTitle("Battery"))
 
-        val lowEnabled = checkBox("Low battery alert", settings.lowBatteryEnabled)
+        val lowEnabled = checkBox(
+            "Low battery alert",
+            settings.lowBatteryEnabled
+        )
+
         val lowThreshold = thresholdInput(
             settings.lowBatteryThreshold,
             "Low battery threshold (%)"
@@ -52,6 +83,7 @@ class SettingsActivity : ComponentActivity() {
             "Critical battery alert",
             settings.criticalBatteryEnabled
         )
+
         val criticalThreshold = thresholdInput(
             settings.criticalBatteryThreshold,
             "Critical battery threshold (%)"
@@ -61,6 +93,7 @@ class SettingsActivity : ComponentActivity() {
             "Full battery alert",
             settings.fullBatteryEnabled
         )
+
         val fullThreshold = thresholdInput(
             settings.fullBatteryThreshold,
             "Full battery threshold (%)"
@@ -73,17 +106,13 @@ class SettingsActivity : ComponentActivity() {
         root.addView(fullEnabled)
         root.addView(fullThreshold)
 
-        root.addView(sectionTitle("Alarm"))
+        batterySoundButton = soundButton(
+            "Battery alert sound",
+            selectedBatteryAlertSoundUri,
+            SoundSelection.BATTERY
+        )
 
-        alarmSoundButton = Button(this).apply {
-            text = alarmSoundLabel(selectedAlarmSoundUri)
-
-            setOnClickListener {
-                openAlarmSoundPicker()
-            }
-        }
-
-        root.addView(alarmSoundButton)
+        root.addView(batterySoundButton)
 
         root.addView(sectionTitle("Power"))
 
@@ -91,13 +120,39 @@ class SettingsActivity : ComponentActivity() {
             "Power OFF alert",
             settings.powerOffEnabled
         )
+
         val powerRestoredEnabled = checkBox(
             "Power restored alert",
             settings.powerRestoredEnabled
         )
 
         root.addView(powerOffEnabled)
+
+        powerOffLockedSoundButton = soundButton(
+            "Power OFF sound — Locked",
+            selectedPowerOffLockedSoundUri,
+            SoundSelection.POWER_OFF_LOCKED
+        )
+
+        root.addView(powerOffLockedSoundButton)
+
+        powerOffUnlockedSoundButton = soundButton(
+            "Power OFF sound — Unlocked",
+            selectedPowerOffUnlockedSoundUri,
+            SoundSelection.POWER_OFF_UNLOCKED
+        )
+
+        root.addView(powerOffUnlockedSoundButton)
+
         root.addView(powerRestoredEnabled)
+
+        powerSupplySoundButton = soundButton(
+            "Power supply alert sound",
+            selectedPowerSupplyAlertSoundUri,
+            SoundSelection.POWER_SUPPLY
+        )
+
+        root.addView(powerSupplySoundButton)
 
         root.addView(sectionTitle("Charging"))
 
@@ -105,6 +160,7 @@ class SettingsActivity : ComponentActivity() {
             "Charging started alert",
             settings.chargingStartedEnabled
         )
+
         val chargingStoppedEnabled = checkBox(
             "Charging stopped alert",
             settings.chargingStoppedEnabled
@@ -115,19 +171,50 @@ class SettingsActivity : ComponentActivity() {
 
         root.addView(Button(this).apply {
             text = "Save Settings"
+
             setOnClickListener {
                 val updated = AlarmSettings(
-                    alarmSoundUri = selectedAlarmSoundUri,
-                    lowBatteryEnabled = lowEnabled.isChecked,
-                    lowBatteryThreshold = readThreshold(lowThreshold),
-                    criticalBatteryEnabled = criticalEnabled.isChecked,
-                    criticalBatteryThreshold = readThreshold(criticalThreshold),
-                    fullBatteryEnabled = fullEnabled.isChecked,
-                    fullBatteryThreshold = readThreshold(fullThreshold),
-                    powerOffEnabled = powerOffEnabled.isChecked,
-                    powerRestoredEnabled = powerRestoredEnabled.isChecked,
-                    chargingStartedEnabled = chargingStartedEnabled.isChecked,
-                    chargingStoppedEnabled = chargingStoppedEnabled.isChecked
+                    batteryAlertSoundUri =
+                        selectedBatteryAlertSoundUri,
+
+                    powerSupplyAlertSoundUri =
+                        selectedPowerSupplyAlertSoundUri,
+
+                    powerOffLockedSoundUri =
+                        selectedPowerOffLockedSoundUri,
+
+                    powerOffUnlockedSoundUri =
+                        selectedPowerOffUnlockedSoundUri,
+
+                    lowBatteryEnabled =
+                        lowEnabled.isChecked,
+
+                    lowBatteryThreshold =
+                        readThreshold(lowThreshold),
+
+                    criticalBatteryEnabled =
+                        criticalEnabled.isChecked,
+
+                    criticalBatteryThreshold =
+                        readThreshold(criticalThreshold),
+
+                    fullBatteryEnabled =
+                        fullEnabled.isChecked,
+
+                    fullBatteryThreshold =
+                        readThreshold(fullThreshold),
+
+                    powerOffEnabled =
+                        powerOffEnabled.isChecked,
+
+                    powerRestoredEnabled =
+                        powerRestoredEnabled.isChecked,
+
+                    chargingStartedEnabled =
+                        chargingStartedEnabled.isChecked,
+
+                    chargingStoppedEnabled =
+                        chargingStoppedEnabled.isChecked
                 )
 
                 settingsStore.save(updated)
@@ -138,7 +225,24 @@ class SettingsActivity : ComponentActivity() {
         setContentView(root)
     }
 
-    private fun openAlarmSoundPicker() {
+    private fun soundButton(
+        label: String,
+        uri: String?,
+        selection: SoundSelection
+    ): Button {
+        return Button(this).apply {
+            text = soundLabel(label, uri)
+
+            setOnClickListener {
+                pendingSoundSelection = selection
+                openSoundPicker(uri)
+            }
+        }
+    }
+
+    private fun openSoundPicker(
+        selectedUri: String?
+    ) {
         val intent = Intent(
             RingtoneManager.ACTION_RINGTONE_PICKER
         ).apply {
@@ -149,10 +253,10 @@ class SettingsActivity : ComponentActivity() {
 
             putExtra(
                 RingtoneManager.EXTRA_RINGTONE_TITLE,
-                "Select alarm sound"
+                "Select alert sound"
             )
 
-            selectedAlarmSoundUri
+            selectedUri
                 ?.takeIf { it.isNotBlank() }
                 ?.let {
                     putExtra(
@@ -164,7 +268,7 @@ class SettingsActivity : ComponentActivity() {
 
         startActivityForResult(
             intent,
-            REQUEST_ALARM_SOUND
+            REQUEST_SOUND
         )
     }
 
@@ -181,23 +285,70 @@ class SettingsActivity : ComponentActivity() {
         )
 
         if (
-            requestCode == REQUEST_ALARM_SOUND &&
-            resultCode == Activity.RESULT_OK
+            requestCode != REQUEST_SOUND ||
+            resultCode != Activity.RESULT_OK
         ) {
-            val uri = data?.getParcelableExtra<Uri>(
-                RingtoneManager.EXTRA_RINGTONE_PICKED_URI
-            )
-
-            selectedAlarmSoundUri = uri?.toString()
-
-            alarmSoundButton.text =
-                alarmSoundLabel(selectedAlarmSoundUri)
+            return
         }
+
+        val uri = data?.getParcelableExtra<Uri>(
+            RingtoneManager.EXTRA_RINGTONE_PICKED_URI
+        )
+
+        when (pendingSoundSelection) {
+            SoundSelection.BATTERY -> {
+                selectedBatteryAlertSoundUri =
+                    uri?.toString()
+
+                batterySoundButton.text = soundLabel(
+                    "Battery alert sound",
+                    selectedBatteryAlertSoundUri
+                )
+            }
+
+            SoundSelection.POWER_SUPPLY -> {
+                selectedPowerSupplyAlertSoundUri =
+                    uri?.toString()
+
+                powerSupplySoundButton.text = soundLabel(
+                    "Power supply alert sound",
+                    selectedPowerSupplyAlertSoundUri
+                )
+            }
+
+            SoundSelection.POWER_OFF_LOCKED -> {
+                selectedPowerOffLockedSoundUri =
+                    uri?.toString()
+
+                powerOffLockedSoundButton.text = soundLabel(
+                    "Power OFF sound — Locked",
+                    selectedPowerOffLockedSoundUri
+                )
+            }
+
+            SoundSelection.POWER_OFF_UNLOCKED -> {
+                selectedPowerOffUnlockedSoundUri =
+                    uri?.toString()
+
+                powerOffUnlockedSoundButton.text = soundLabel(
+                    "Power OFF sound — Unlocked",
+                    selectedPowerOffUnlockedSoundUri
+                )
+
+            }
+
+            null -> Unit
+        }
+
+        pendingSoundSelection = null
     }
 
-    private fun alarmSoundLabel(uriString: String?): String {
+    private fun soundLabel(
+        label: String,
+        uriString: String?
+    ): String {
         if (uriString.isNullOrBlank()) {
-            return "Alarm sound: System default"
+            return "$label: System default"
         }
 
         val ringtone = RingtoneManager.getRingtone(
@@ -208,9 +359,9 @@ class SettingsActivity : ComponentActivity() {
         val title = ringtone?.getTitle(this)
 
         return if (title.isNullOrBlank()) {
-            "Alarm sound: Selected"
+            "$label: Selected"
         } else {
-            "Alarm sound: $title"
+            "$label: $title"
         }
     }
 
@@ -237,13 +388,17 @@ class SettingsActivity : ComponentActivity() {
         hint: String
     ): EditText {
         return EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            inputType =
+                android.text.InputType.TYPE_CLASS_NUMBER
+
             this.hint = hint
             setText(value.toString())
         }
     }
 
-    private fun readThreshold(input: EditText): Int {
+    private fun readThreshold(
+        input: EditText
+    ): Int {
         return input.text
             .toString()
             .toIntOrNull()

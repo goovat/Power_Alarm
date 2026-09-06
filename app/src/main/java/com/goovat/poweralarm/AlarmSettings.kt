@@ -3,7 +3,10 @@ package com.goovat.poweralarm
 import android.content.Context
 
 data class AlarmSettings(
-    val alarmSoundUri: String? = null,
+    val batteryAlertSoundUri: String? = null,
+    val powerSupplyAlertSoundUri: String? = null,
+    val powerOffLockedSoundUri: String? = null,
+    val powerOffUnlockedSoundUri: String? = null,
     val lowBatteryEnabled: Boolean = true,
     val lowBatteryThreshold: Int = 20,
     val criticalBatteryEnabled: Boolean = true,
@@ -25,8 +28,20 @@ class AlarmSettingsStore(context: Context) {
 
     fun load(): AlarmSettings {
         return AlarmSettings(
-            alarmSoundUri = preferences.getString(
-                KEY_ALARM_SOUND_URI,
+            batteryAlertSoundUri = preferences.getString(
+                KEY_BATTERY_ALERT_SOUND_URI,
+                null
+            ),
+            powerSupplyAlertSoundUri = preferences.getString(
+                KEY_POWER_SUPPLY_ALERT_SOUND_URI,
+                null
+            ),
+            powerOffLockedSoundUri = preferences.getString(
+                KEY_POWER_OFF_LOCKED_SOUND_URI,
+                null
+            ),
+            powerOffUnlockedSoundUri = preferences.getString(
+                KEY_POWER_OFF_UNLOCKED_SOUND_URI,
                 null
             ),
             lowBatteryEnabled = preferences.getBoolean(
@@ -74,31 +89,106 @@ class AlarmSettingsStore(context: Context) {
 
     fun save(settings: AlarmSettings) {
         preferences.edit()
-            .putString(KEY_ALARM_SOUND_URI, settings.alarmSoundUri)
-            .putBoolean(KEY_LOW_ENABLED, settings.lowBatteryEnabled)
-            .putInt(KEY_LOW_THRESHOLD, settings.lowBatteryThreshold.coerceIn(1, 100))
-            .putBoolean(KEY_CRITICAL_ENABLED, settings.criticalBatteryEnabled)
-            .putInt(KEY_CRITICAL_THRESHOLD, settings.criticalBatteryThreshold.coerceIn(1, 100))
-            .putBoolean(KEY_FULL_ENABLED, settings.fullBatteryEnabled)
-            .putInt(KEY_FULL_THRESHOLD, settings.fullBatteryThreshold.coerceIn(1, 100))
-            .putBoolean(KEY_POWER_OFF_ENABLED, settings.powerOffEnabled)
-            .putBoolean(KEY_POWER_RESTORED_ENABLED, settings.powerRestoredEnabled)
-            .putBoolean(KEY_CHARGING_STARTED_ENABLED, settings.chargingStartedEnabled)
-            .putBoolean(KEY_CHARGING_STOPPED_ENABLED, settings.chargingStoppedEnabled)
+            .putString(
+                KEY_BATTERY_ALERT_SOUND_URI,
+                settings.batteryAlertSoundUri
+            )
+            .putString(
+                KEY_POWER_SUPPLY_ALERT_SOUND_URI,
+                settings.powerSupplyAlertSoundUri
+            )
+            .putString(
+                KEY_POWER_OFF_LOCKED_SOUND_URI,
+                settings.powerOffLockedSoundUri
+            )
+            .putString(
+                KEY_POWER_OFF_UNLOCKED_SOUND_URI,
+                settings.powerOffUnlockedSoundUri
+            )
+            .putBoolean(
+                KEY_LOW_ENABLED,
+                settings.lowBatteryEnabled
+            )
+            .putInt(
+                KEY_LOW_THRESHOLD,
+                settings.lowBatteryThreshold.coerceIn(1, 100)
+            )
+            .putBoolean(
+                KEY_CRITICAL_ENABLED,
+                settings.criticalBatteryEnabled
+            )
+            .putInt(
+                KEY_CRITICAL_THRESHOLD,
+                settings.criticalBatteryThreshold.coerceIn(1, 100)
+            )
+            .putBoolean(
+                KEY_FULL_ENABLED,
+                settings.fullBatteryEnabled
+            )
+            .putInt(
+                KEY_FULL_THRESHOLD,
+                settings.fullBatteryThreshold.coerceIn(1, 100)
+            )
+            .putBoolean(
+                KEY_POWER_OFF_ENABLED,
+                settings.powerOffEnabled
+            )
+            .putBoolean(
+                KEY_POWER_RESTORED_ENABLED,
+                settings.powerRestoredEnabled
+            )
+            .putBoolean(
+                KEY_CHARGING_STARTED_ENABLED,
+                settings.chargingStartedEnabled
+            )
+            .putBoolean(
+                KEY_CHARGING_STOPPED_ENABLED,
+                settings.chargingStoppedEnabled
+            )
             .apply()
     }
 
     companion object {
-        private const val KEY_ALARM_SOUND_URI = "alarm_sound_uri"
-        private const val KEY_LOW_ENABLED = "low_battery_enabled"
-        private const val KEY_LOW_THRESHOLD = "low_battery_threshold"
-        private const val KEY_CRITICAL_ENABLED = "critical_battery_enabled"
-        private const val KEY_CRITICAL_THRESHOLD = "critical_battery_threshold"
-        private const val KEY_FULL_ENABLED = "full_battery_enabled"
-        private const val KEY_FULL_THRESHOLD = "full_battery_threshold"
-        private const val KEY_POWER_OFF_ENABLED = "power_off_enabled"
-        private const val KEY_POWER_RESTORED_ENABLED = "power_restored_enabled"
-        private const val KEY_CHARGING_STARTED_ENABLED = "charging_started_enabled"
-        private const val KEY_CHARGING_STOPPED_ENABLED = "charging_stopped_enabled"
+        private const val KEY_BATTERY_ALERT_SOUND_URI =
+            "battery_alert_sound_uri"
+
+        private const val KEY_POWER_SUPPLY_ALERT_SOUND_URI =
+            "power_supply_alert_sound_uri"
+
+        private const val KEY_POWER_OFF_LOCKED_SOUND_URI =
+            "power_off_locked_sound_uri"
+
+        private const val KEY_POWER_OFF_UNLOCKED_SOUND_URI =
+            "power_off_unlocked_sound_uri"
+
+        private const val KEY_LOW_ENABLED =
+            "low_battery_enabled"
+
+        private const val KEY_LOW_THRESHOLD =
+            "low_battery_threshold"
+
+        private const val KEY_CRITICAL_ENABLED =
+            "critical_battery_enabled"
+
+        private const val KEY_CRITICAL_THRESHOLD =
+            "critical_battery_threshold"
+
+        private const val KEY_FULL_ENABLED =
+            "full_battery_enabled"
+
+        private const val KEY_FULL_THRESHOLD =
+            "full_battery_threshold"
+
+        private const val KEY_POWER_OFF_ENABLED =
+            "power_off_enabled"
+
+        private const val KEY_POWER_RESTORED_ENABLED =
+            "power_restored_enabled"
+
+        private const val KEY_CHARGING_STARTED_ENABLED =
+            "charging_started_enabled"
+
+        private const val KEY_CHARGING_STOPPED_ENABLED =
+            "charging_stopped_enabled"
     }
 }
