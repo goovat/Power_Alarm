@@ -20,6 +20,7 @@ class AlarmService : Service() {
     private lateinit var settingsStore: AlarmSettingsStore
     private lateinit var eventEvaluator: AlarmEventEvaluator
     private lateinit var alarmEngine: AlarmEngine
+    private lateinit var sessionStore: AlarmSessionStore
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -43,6 +44,7 @@ class AlarmService : Service() {
         settingsStore = AlarmSettingsStore(this)
         eventEvaluator = AlarmEventEvaluator()
         alarmEngine = AlarmEngine(this)
+        sessionStore = AlarmSessionStore(this)
 
         createNotificationChannels()
 
@@ -53,6 +55,8 @@ class AlarmService : Service() {
 
         previousPower = powerMonitor.getCurrentState()
         previousBattery = batteryMonitor.getCurrentState()
+
+        restorePersistedAlarmSession()
 
         handler.post(monitorRunnable)
     }
@@ -103,7 +107,45 @@ class AlarmService : Service() {
 
         if (!wasActive && alarmEngine.isActive) {
             activeAlarmSessionToken = UUID.randomUUID().toString()
+
+            sessionStore.save(
+                activeAlarmSessionToken!!,
+                event
+            )
+
             showAlarmNotification(event)
+        }
+    }
+
+    private fun restorePersistedAlarmSession() {
+        val persistedSession = sessionStore.load()
+            ?: return
+
+        if (alarmEngine.isActive) {
+            return
+        }
+
+        activeAlarmSessionToken = persistedSession.token
+
+        alarmEngine.trigger(persistedSession.event)
+
+        if (alarmEngine.isActive) {
+            Log.i(
+                TAG,
+                "Restored persisted alarm session"
+            )
+
+            showAlarmNotification(
+                persistedSession.event
+            )
+        } else {
+            Log.w(
+                TAG,
+                "Failed to restore persisted alarm session"
+            )
+
+            activeAlarmSessionToken = null
+            sessionStore.clear()
         }
     }
 
@@ -291,6 +333,7 @@ class AlarmService : Service() {
 
             alarmEngine.release()
             activeAlarmSessionToken = null
+            sessionStore.clear()
 
             val manager = getSystemService(
                 NotificationManager::class.java
