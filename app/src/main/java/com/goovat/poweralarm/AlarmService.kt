@@ -22,6 +22,8 @@ class AlarmService : Service() {
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var settingsStore: AlarmSettingsStore
     private lateinit var eventEvaluator: AlarmEventEvaluator
+    private lateinit var batteryEventHandler: BatteryEventHandler
+    private lateinit var powerEventHandler: PowerEventHandler
     private lateinit var alarmEngine: AlarmEngine
     private lateinit var sessionStore: AlarmSessionStore
 
@@ -37,12 +39,23 @@ class AlarmService : Service() {
             context: Context?,
             intent: Intent?
         ) {
+            val action = intent?.action
+
             Log.i(
                 TAG,
-                "State broadcast received: ${intent?.action}"
+                "State broadcast received: $action"
             )
 
-            processCurrentState()
+            when (action) {
+                Intent.ACTION_BATTERY_CHANGED -> {
+                    processBatteryState()
+                }
+
+                Intent.ACTION_POWER_CONNECTED,
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    processPowerState()
+                }
+            }
         }
     }
 
@@ -65,6 +78,8 @@ class AlarmService : Service() {
         batteryMonitor = BatteryMonitor(this)
         settingsStore = AlarmSettingsStore(this)
         eventEvaluator = AlarmEventEvaluator()
+        batteryEventHandler = BatteryEventHandler(eventEvaluator)
+        powerEventHandler = PowerEventHandler(eventEvaluator)
         alarmEngine = AlarmEngine(this)
         sessionStore = AlarmSessionStore(this)
 
@@ -119,36 +134,50 @@ class AlarmService : Service() {
         val currentBattery = batteryMonitor.getCurrentState()
         val settings = settingsStore.load()
 
-        val oldPower = previousPower
-        val oldBattery = previousBattery
+        processPowerState(
+            currentPower = currentPower,
+            settings = settings
+        )
 
-        if (oldPower != null) {
-            val events = eventEvaluator.evaluatePowerEvents(
-                previous = oldPower,
-                current = currentPower,
-                settings = settings
-            )
-
-            events.forEach(::handleEvent)
-        }
-
-        if (oldBattery != null) {
-            val events = eventEvaluator.evaluateBatteryEvents(
-                previous = oldBattery,
-                current = currentBattery,
-                settings = settings
-            )
-
-            events.forEach(::handleEvent)
-        }
-
-        previousPower = currentPower
-        previousBattery = currentBattery
+        processBatteryState(
+            currentBattery = currentBattery,
+            settings = settings
+        )
 
         updateMonitoringNotification(
             currentBattery,
             currentPower
         )
+    }
+
+    private fun processPowerState(
+        currentPower: PowerSnapshot = powerMonitor.getCurrentState(),
+        settings: AlarmSettings = settingsStore.load()
+    ) {
+        val events = powerEventHandler.evaluate(
+            previous = previousPower,
+            current = currentPower,
+            settings = settings
+        )
+
+        events.forEach(::handleEvent)
+
+        previousPower = currentPower
+    }
+
+    private fun processBatteryState(
+        currentBattery: BatterySnapshot = batteryMonitor.getCurrentState(),
+        settings: AlarmSettings = settingsStore.load()
+    ) {
+        val events = batteryEventHandler.evaluate(
+            previous = previousBattery,
+            current = currentBattery,
+            settings = settings
+        )
+
+        events.forEach(::handleEvent)
+
+        previousBattery = currentBattery
     }
 
     private fun handleEvent(event: AlarmEvent) {
@@ -427,7 +456,18 @@ class AlarmService : Service() {
                 return START_STICKY
             }
 
+            Log.i(
+                TAG,
+                "Authenticated alarm stop request accepted"
+            )
+
             alarmEngine.release()
+
+            Log.i(
+                TAG,
+                "Alarm engine released; power-off alarm stopped"
+            )
+
             activeAlarmSessionToken = null
             sessionStore.clear()
 
@@ -437,6 +477,11 @@ class AlarmService : Service() {
 
             manager.cancel(
                 ALARM_NOTIFICATION_ID
+            )
+
+            Log.i(
+                TAG,
+                "Alarm session cleared and alarm notification cancelled"
             )
         }
 

@@ -67,6 +67,12 @@ class AlarmActivity : FragmentActivity() {
 
                     authenticationStarted = false
                     authenticationCompleted = true
+
+                    android.util.Log.i(
+                        TAG,
+                        "Fingerprint authentication succeeded; stopping alarm"
+                    )
+
                     stopAlarm()
                 }
 
@@ -128,7 +134,19 @@ class AlarmActivity : FragmentActivity() {
 
     private fun stopAlarm() {
         val sessionToken = alarmSessionToken
-            ?: return
+
+        if (sessionToken == null) {
+            android.util.Log.w(
+                TAG,
+                "Cannot stop alarm: session token is missing"
+            )
+            return
+        }
+
+        android.util.Log.i(
+            TAG,
+            "Sending authenticated alarm stop request"
+        )
 
         AlarmService.stopAlarm(
             this,
@@ -136,6 +154,10 @@ class AlarmActivity : FragmentActivity() {
         )
 
         finishAndRemoveTask()
+    }
+
+    companion object {
+        private const val TAG = "PowerAlarmActivity"
     }
 
     override fun onBackPressed() {
