@@ -15,6 +15,8 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
 
+    private lateinit var monitoringStatusText: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -63,6 +65,15 @@ class MainActivity : ComponentActivity() {
             setPadding(0, 32, 0, 32)
         })
 
+        monitoringStatusText = TextView(this).apply {
+            textSize = 20f
+            setPadding(0, 0, 0, 24)
+        }
+
+        root.addView(monitoringStatusText)
+
+        updateMonitoringStatus()
+
         root.addView(Button(this).apply {
             text = "Start Monitoring"
 
@@ -76,6 +87,8 @@ class MainActivity : ComponentActivity() {
                     this@MainActivity,
                     intent
                 )
+
+                updateMonitoringStatus()
             }
         })
 
@@ -86,6 +99,8 @@ class MainActivity : ComponentActivity() {
                 AlarmService.stopMonitoring(
                     this@MainActivity
                 )
+
+                updateMonitoringStatus()
             }
         })
 
@@ -103,6 +118,22 @@ class MainActivity : ComponentActivity() {
         })
 
         setContentView(root)
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        if (::monitoringStatusText.isInitialized) {
+            updateMonitoringStatus()
+        }
+    }
+
+    private fun updateMonitoringStatus() {
+        monitoringStatusText.text = if (AlarmService.isMonitoring) {
+            "Monitoring: ON"
+        } else {
+            "Monitoring: OFF"
+        }
     }
 
     private fun requestNotificationPermission() {
