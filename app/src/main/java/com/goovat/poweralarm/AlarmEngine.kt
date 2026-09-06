@@ -46,7 +46,7 @@ class AlarmEngine(
     private fun startSound() {
         val settings = AlarmSettingsStore(context).load()
 
-        val selectedUri = settings.alarmSoundUri
+        val selectedUri = settings.powerOffLockedSoundUri
             ?.takeIf { it.isNotBlank() }
             ?.let(Uri::parse)
 
