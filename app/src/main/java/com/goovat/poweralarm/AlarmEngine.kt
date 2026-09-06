@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.util.Log
 
 class AlarmEngine(
     private val context: Context
@@ -24,10 +25,21 @@ class AlarmEngine(
             return
         }
 
-        isActive = true
+        try {
+            startSound()
+            startVibration()
+            isActive = true
 
-        startSound()
-        startVibration()
+            Log.i(TAG, "Alarm activated for event: $event")
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "Failed to activate alarm for event: $event",
+                error
+            )
+
+            release()
+        }
     }
 
     private fun startSound() {
@@ -35,6 +47,8 @@ class AlarmEngine(
             RingtoneManager.TYPE_ALARM
         ) ?: RingtoneManager.getDefaultUri(
             RingtoneManager.TYPE_NOTIFICATION
+        ) ?: throw IllegalStateException(
+            "No alarm or notification ringtone available"
         )
 
         mediaPlayer = MediaPlayer().apply {
@@ -63,7 +77,9 @@ class AlarmEngine(
             manager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
-            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            context.getSystemService(
+                Context.VIBRATOR_SERVICE
+            ) as? Vibrator
         }
 
         val pattern = longArrayOf(
@@ -88,7 +104,11 @@ class AlarmEngine(
     }
 
     fun release() {
-        mediaPlayer?.stop()
+        try {
+            mediaPlayer?.stop()
+        } catch (_: IllegalStateException) {
+        }
+
         mediaPlayer?.release()
         mediaPlayer = null
 
@@ -96,5 +116,9 @@ class AlarmEngine(
         vibrator = null
 
         isActive = false
+    }
+
+    companion object {
+        private const val TAG = "PowerAlarmEngine"
     }
 }
