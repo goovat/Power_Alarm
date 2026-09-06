@@ -5,8 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -29,10 +32,27 @@ class AlarmService : Service() {
 
     private var activeAlarmSessionToken: String? = null
 
+    private val stateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(
+            context: Context?,
+            intent: Intent?
+        ) {
+            Log.i(
+                TAG,
+                "State broadcast received: ${intent?.action}"
+            )
+
+            processCurrentState()
+        }
+    }
+
     private val monitorRunnable = object : Runnable {
         override fun run() {
-            checkState()
-            handler.postDelayed(this, MONITOR_INTERVAL_MS)
+            processCurrentState()
+            handler.postDelayed(
+                this,
+                MONITOR_INTERVAL_MS
+            )
         }
     }
 
@@ -50,18 +70,49 @@ class AlarmService : Service() {
 
         startForeground(
             NOTIFICATION_ID,
-            buildMonitoringNotification("Monitoring power and battery")
+            buildMonitoringNotification(
+                "Monitoring power and battery"
+            )
         )
 
         previousPower = powerMonitor.getCurrentState()
         previousBattery = batteryMonitor.getCurrentState()
+
+        registerStateReceiver()
 
         restorePersistedAlarmSession()
 
         handler.post(monitorRunnable)
     }
 
-    private fun checkState() {
+    private fun registerStateReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_POWER_CONNECTED)
+            addAction(Intent.ACTION_POWER_DISCONNECTED)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                stateReceiver,
+                filter,
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(
+                stateReceiver,
+                filter
+            )
+        }
+
+        Log.i(
+            TAG,
+            "Immediate state receiver registered"
+        )
+    }
+
+    private fun processCurrentState() {
         val currentPower = powerMonitor.getCurrentState()
         val currentBattery = batteryMonitor.getCurrentState()
         val settings = settingsStore.load()
@@ -99,14 +150,18 @@ class AlarmService : Service() {
     }
 
     private fun handleEvent(event: AlarmEvent) {
-        Log.i(TAG, "Alarm event detected: $event")
+        Log.i(
+            TAG,
+            "Alarm event detected: $event"
+        )
 
         val wasActive = alarmEngine.isActive
 
         alarmEngine.trigger(event)
 
         if (!wasActive && alarmEngine.isActive) {
-            activeAlarmSessionToken = UUID.randomUUID().toString()
+            activeAlarmSessionToken =
+                UUID.randomUUID().toString()
 
             sessionStore.save(
                 activeAlarmSessionToken!!,
@@ -125,9 +180,12 @@ class AlarmService : Service() {
             return
         }
 
-        activeAlarmSessionToken = persistedSession.token
+        activeAlarmSessionToken =
+            persistedSession.token
 
-        alarmEngine.trigger(persistedSession.event)
+        alarmEngine.trigger(
+            persistedSession.event
+        )
 
         if (alarmEngine.isActive) {
             Log.i(
@@ -157,7 +215,9 @@ class AlarmService : Service() {
             return
         }
 
-        val powerText = if (power.isExternalPowerConnected) {
+        val powerText = if (
+            power.isExternalPowerConnected
+        ) {
             "Power connected"
         } else {
             "Power disconnected"
@@ -177,9 +237,12 @@ class AlarmService : Service() {
         )
     }
 
-    private fun showAlarmNotification(event: AlarmEvent) {
-        val sessionToken = activeAlarmSessionToken
-            ?: return
+    private fun showAlarmNotification(
+        event: AlarmEvent
+    ) {
+        val sessionToken =
+            activeAlarmSessionToken
+                ?: return
 
         val intent = Intent(
             this,
@@ -209,12 +272,18 @@ class AlarmService : Service() {
             ALARM_CHANNEL_ID
         )
             .setContentTitle("Power Alarm")
-            .setContentText(eventDescription(event))
+            .setContentText(
+                eventDescription(event)
+            )
             .setSmallIcon(
                 android.R.drawable.ic_lock_idle_charging
             )
-            .setCategory(Notification.CATEGORY_ALARM)
-            .setPriority(Notification.PRIORITY_MAX)
+            .setCategory(
+                Notification.CATEGORY_ALARM
+            )
+            .setPriority(
+                Notification.PRIORITY_MAX
+            )
             .setOngoing(true)
             .setAutoCancel(false)
             .setContentIntent(pendingIntent)
@@ -234,7 +303,9 @@ class AlarmService : Service() {
         )
     }
 
-    private fun eventDescription(event: AlarmEvent): String {
+    private fun eventDescription(
+        event: AlarmEvent
+    ): String {
         return when (event) {
             AlarmEvent.PowerOff ->
                 "External power disconnected"
@@ -316,11 +387,14 @@ class AlarmService : Service() {
     ): Int {
         if (intent?.action == ACTION_STOP_ALARM) {
             val suppliedToken =
-                intent.getStringExtra(EXTRA_ALARM_SESSION_TOKEN)
+                intent.getStringExtra(
+                    EXTRA_ALARM_SESSION_TOKEN
+                )
 
             if (
                 suppliedToken == null ||
-                suppliedToken != activeAlarmSessionToken ||
+                suppliedToken !=
+                    activeAlarmSessionToken ||
                 !alarmEngine.isActive
             ) {
                 Log.w(
@@ -339,14 +413,30 @@ class AlarmService : Service() {
                 NotificationManager::class.java
             )
 
-            manager.cancel(ALARM_NOTIFICATION_ID)
+            manager.cancel(
+                ALARM_NOTIFICATION_ID
+            )
         }
 
         return START_STICKY
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(monitorRunnable)
+        handler.removeCallbacks(
+            monitorRunnable
+        )
+
+        try {
+            unregisterReceiver(
+                stateReceiver
+            )
+        } catch (_: IllegalArgumentException) {
+            Log.w(
+                TAG,
+                "State receiver was already unregistered"
+            )
+        }
+
         alarmEngine.release()
         activeAlarmSessionToken = null
 
@@ -354,17 +444,22 @@ class AlarmService : Service() {
             NotificationManager::class.java
         )
 
-        manager.cancel(ALARM_NOTIFICATION_ID)
+        manager.cancel(
+            ALARM_NOTIFICATION_ID
+        )
 
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? {
         return null
     }
 
     companion object {
-        private const val TAG = "PowerAlarm"
+        private const val TAG =
+            "PowerAlarm"
 
         private const val CHANNEL_ID =
             "power_monitoring"
