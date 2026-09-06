@@ -1,5 +1,6 @@
 package com.goovat.poweralarm
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -18,6 +19,8 @@ class AlarmEngine(
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
 
+    private val oneShotPlayers = mutableSetOf<MediaPlayer>()
+
     var isActive: Boolean = false
         private set
 
@@ -27,15 +30,28 @@ class AlarmEngine(
         }
 
         try {
-            startSound()
-            startVibration()
-            isActive = true
+            when (event) {
+                AlarmEvent.PowerOff -> triggerPowerOff()
+                AlarmEvent.PowerRestored,
+                AlarmEvent.ChargingStarted,
+                AlarmEvent.ChargingStopped -> {
+                    playOnce(
+                        soundUri = loadPowerSupplySoundUri()
+                    )
+                }
 
-            Log.i(TAG, "Alarm activated for event: $event")
+                is AlarmEvent.LowBattery,
+                is AlarmEvent.CriticalBattery,
+                is AlarmEvent.FullBattery -> {
+                    playOnce(
+                        soundUri = loadBatterySoundUri()
+                    )
+                }
+            }
         } catch (error: Exception) {
             Log.e(
                 TAG,
-                "Failed to activate alarm for event: $event",
+                "Failed to trigger event: $event",
                 error
             )
 
@@ -43,14 +59,149 @@ class AlarmEngine(
         }
     }
 
-    private fun startSound() {
+    private fun triggerPowerOff() {
+        val keyguardManager = context.getSystemService(
+            KeyguardManager::class.java
+        )
+
+        val isLocked = keyguardManager?.isKeyguardLocked == true
+
+        if (isLocked) {
+            startProtectedPowerOffAlarm()
+        } else {
+            playOnce(
+                soundUri = loadPowerOffUnlockedSoundUri()
+            )
+        }
+    }
+
+    private fun startProtectedPowerOffAlarm() {
+        startSound(
+            soundUri = loadPowerOffLockedSoundUri(),
+            looping = true
+        )
+
+        startVibration()
+
+        isActive = true
+
+        Log.i(
+            TAG,
+            "Protected Power OFF alarm activated"
+        )
+    }
+
+    private fun playOnce(soundUri: Uri) {
+        val player = MediaPlayer().apply {
+            setDataSource(context, soundUri)
+
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(
+                        AudioAttributes.USAGE_ALARM
+                    )
+                    .setContentType(
+                        AudioAttributes.CONTENT_TYPE_SONIFICATION
+                    )
+                    .build()
+            )
+
+            setOnCompletionListener { completedPlayer ->
+                synchronized(oneShotPlayers) {
+                    oneShotPlayers.remove(completedPlayer)
+                }
+
+                completedPlayer.release()
+            }
+
+            setOnErrorListener { failedPlayer, _, _ ->
+                synchronized(oneShotPlayers) {
+                    oneShotPlayers.remove(failedPlayer)
+                }
+
+                failedPlayer.release()
+                true
+            }
+
+            prepare()
+        }
+
+        synchronized(oneShotPlayers) {
+            oneShotPlayers.add(player)
+        }
+
+        player.start()
+
+        Log.i(
+            TAG,
+            "One-shot alert sound started"
+        )
+    }
+
+    private fun startSound(
+        soundUri: Uri,
+        looping: Boolean
+    ) {
+        mediaPlayer = MediaPlayer().apply {
+            setDataSource(context, soundUri)
+
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(
+                        AudioAttributes.USAGE_ALARM
+                    )
+                    .setContentType(
+                        AudioAttributes.CONTENT_TYPE_SONIFICATION
+                    )
+                    .build()
+            )
+
+            isLooping = looping
+            prepare()
+            start()
+        }
+    }
+
+    private fun loadBatterySoundUri(): Uri {
         val settings = AlarmSettingsStore(context).load()
 
-        val selectedUri = settings.powerOffLockedSoundUri
+        return selectedUriOrDefault(
+            settings.batteryAlertSoundUri
+        )
+    }
+
+    private fun loadPowerSupplySoundUri(): Uri {
+        val settings = AlarmSettingsStore(context).load()
+
+        return selectedUriOrDefault(
+            settings.powerSupplyAlertSoundUri
+        )
+    }
+
+    private fun loadPowerOffLockedSoundUri(): Uri {
+        val settings = AlarmSettingsStore(context).load()
+
+        return selectedUriOrDefault(
+            settings.powerOffLockedSoundUri
+        )
+    }
+
+    private fun loadPowerOffUnlockedSoundUri(): Uri {
+        val settings = AlarmSettingsStore(context).load()
+
+        return selectedUriOrDefault(
+            settings.powerOffUnlockedSoundUri
+        )
+    }
+
+    private fun selectedUriOrDefault(
+        storedUri: String?
+    ): Uri {
+        val selectedUri = storedUri
             ?.takeIf { it.isNotBlank() }
             ?.let(Uri::parse)
 
-        val uri = selectedUri
+        return selectedUri
             ?: RingtoneManager.getDefaultUri(
                 RingtoneManager.TYPE_ALARM
             )
@@ -60,23 +211,6 @@ class AlarmEngine(
             ?: throw IllegalStateException(
                 "No alarm or notification ringtone available"
             )
-
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(context, uri)
-
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(
-                        AudioAttributes.CONTENT_TYPE_SONIFICATION
-                    )
-                    .build()
-            )
-
-            isLooping = true
-            prepare()
-            start()
-        }
     }
 
     private fun startVibration() {
@@ -84,6 +218,7 @@ class AlarmEngine(
             val manager = context.getSystemService(
                 VibratorManager::class.java
             )
+
             manager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
@@ -121,6 +256,19 @@ class AlarmEngine(
 
         mediaPlayer?.release()
         mediaPlayer = null
+
+        synchronized(oneShotPlayers) {
+            oneShotPlayers.forEach { player ->
+                try {
+                    player.stop()
+                } catch (_: IllegalStateException) {
+                }
+
+                player.release()
+            }
+
+            oneShotPlayers.clear()
+        }
 
         vibrator?.cancel()
         vibrator = null
