@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 
@@ -222,7 +223,11 @@ class SettingsActivity : ComponentActivity() {
             }
         })
 
-        setContentView(root)
+        val scrollView = ScrollView(this).apply {
+            addView(root)
+        }
+
+        setContentView(scrollView)
     }
 
     private fun soundButton(
