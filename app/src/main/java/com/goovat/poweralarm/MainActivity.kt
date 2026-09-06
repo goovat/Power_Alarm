@@ -20,6 +20,10 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var monitoringStatusText: TextView
     private lateinit var monitoringCard: LinearLayout
+    private lateinit var batteryValueText: TextView
+    private lateinit var batteryDetailText: TextView
+    private lateinit var powerValueText: TextView
+    private lateinit var powerDetailText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,6 +126,9 @@ class MainActivity : ComponentActivity() {
             detail = "$chargingText  •  ${battery.temperatureCelsius}°C"
         )
 
+        batteryValueText = batteryCard.getChildAt(1) as TextView
+        batteryDetailText = batteryCard.getChildAt(2) as TextView
+
         root.addView(
             batteryCard,
             LinearLayout.LayoutParams(
@@ -147,6 +154,9 @@ class MainActivity : ComponentActivity() {
                 "Phone is not charging"
             }
         )
+
+        powerValueText = powerCard.getChildAt(1) as TextView
+        powerDetailText = powerCard.getChildAt(2) as TextView
 
         root.addView(
             powerCard,
@@ -231,6 +241,36 @@ class MainActivity : ComponentActivity() {
 
         if (::monitoringStatusText.isInitialized) {
             updateMonitoringStatus()
+            updateCurrentState()
+        }
+    }
+
+    private fun updateCurrentState() {
+        val battery = BatteryMonitor(this).getCurrentState()
+        val power = PowerMonitor(this).getCurrentState()
+
+        val chargingText = when (battery.status) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
+            BatteryManager.BATTERY_STATUS_FULL -> "Full"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Not charging"
+            else -> "Unknown"
+        }
+
+        batteryValueText.text = "${battery.percentage}%"
+        batteryDetailText.text =
+            "$chargingText  •  ${battery.temperatureCelsius}°C"
+
+        powerValueText.text = if (power.isExternalPowerConnected) {
+            "Connected"
+        } else {
+            "Disconnected"
+        }
+
+        powerDetailText.text = if (power.isCharging) {
+            "Phone is receiving power"
+        } else {
+            "Phone is not charging"
         }
     }
 
