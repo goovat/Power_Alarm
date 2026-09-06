@@ -80,6 +80,16 @@ class MainActivity : ComponentActivity() {
         })
 
         root.addView(Button(this).apply {
+            text = "Stop Monitoring"
+
+            setOnClickListener {
+                AlarmService.stopMonitoring(
+                    this@MainActivity
+                )
+            }
+        })
+
+        root.addView(Button(this).apply {
             text = "Settings"
 
             setOnClickListener {

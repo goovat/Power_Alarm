@@ -385,6 +385,26 @@ class AlarmService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+        if (intent?.action == ACTION_STOP_MONITORING) {
+            if (alarmEngine.isActive) {
+                Log.w(
+                    TAG,
+                    "Rejected monitoring stop while power alarm is active"
+                )
+
+                return START_STICKY
+            }
+
+            Log.i(
+                TAG,
+                "Monitoring stopped by user"
+            )
+
+            stopSelf()
+
+            return START_NOT_STICKY
+        }
+
         if (intent?.action == ACTION_STOP_ALARM) {
             val suppliedToken =
                 intent.getStringExtra(
@@ -479,11 +499,27 @@ class AlarmService : Service() {
         private const val MONITOR_INTERVAL_MS =
             5_000L
 
+        private const val ACTION_STOP_MONITORING =
+            "com.goovat.poweralarm.action.STOP_MONITORING"
+
         private const val ACTION_STOP_ALARM =
             "com.goovat.poweralarm.action.STOP_ALARM"
 
         const val EXTRA_ALARM_SESSION_TOKEN =
             "com.goovat.poweralarm.extra.ALARM_SESSION_TOKEN"
+
+        fun stopMonitoring(
+            context: Context
+        ) {
+            val intent = Intent(
+                context,
+                AlarmService::class.java
+            ).apply {
+                action = ACTION_STOP_MONITORING
+            }
+
+            context.startService(intent)
+        }
 
         fun stopAlarm(
             context: Context,
