@@ -3,9 +3,12 @@ package com.goovat.poweralarm
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.BatteryManager
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -16,6 +19,7 @@ import androidx.core.content.ContextCompat
 class MainActivity : ComponentActivity() {
 
     private lateinit var monitoringStatusText: TextView
+    private lateinit var monitoringCard: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,84 +42,186 @@ class MainActivity : ComponentActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
+            setPadding(32, 32, 32, 32)
+            setBackgroundColor(Color.rgb(246, 248, 252))
         }
 
-        root.addView(TextView(this).apply {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(24, 36, 24, 36)
+            background = roundedBackground(
+                Color.rgb(25, 103, 210),
+                28f
+            )
+        }
+
+        header.addView(TextView(this).apply {
+            text = "⚡"
+            textSize = 42f
+            gravity = Gravity.CENTER
+        })
+
+        header.addView(TextView(this).apply {
             text = "Power Alarm"
-            textSize = 28f
+            textSize = 30f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
         })
 
-        root.addView(TextView(this).apply {
-            text = """
-                Battery: ${battery.percentage}%
-                Status: $chargingText
-                Temperature: ${battery.temperatureCelsius}°C
-
-                Power: ${
-                    if (power.isExternalPowerConnected) {
-                        "External power connected"
-                    } else {
-                        "External power disconnected"
-                    }
-                }
-            """.trimIndent()
-
-            textSize = 20f
-            setPadding(0, 32, 0, 32)
+        header.addView(TextView(this).apply {
+            text = "Power & battery monitoring"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            alpha = 0.9f
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 0)
         })
+
+        root.addView(
+            header,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 24
+            }
+        )
+
+        root.addView(sectionLabel("MONITORING"))
+
+        monitoringCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+        }
 
         monitoringStatusText = TextView(this).apply {
-            textSize = 20f
-            setPadding(0, 0, 0, 24)
+            textSize = 22f
+            gravity = Gravity.CENTER
         }
 
-        root.addView(monitoringStatusText)
+        monitoringCard.addView(monitoringStatusText)
+
+        root.addView(
+            monitoringCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 24
+            }
+        )
 
         updateMonitoringStatus()
 
-        root.addView(Button(this).apply {
-            text = "Start Monitoring"
+        root.addView(sectionLabel("BATTERY"))
 
-            setOnClickListener {
-                val intent = Intent(
+        val batteryCard = infoCard(
+            title = "🔋 Battery",
+            value = "${battery.percentage}%",
+            detail = "$chargingText  •  ${battery.temperatureCelsius}°C"
+        )
+
+        root.addView(
+            batteryCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 16
+            }
+        )
+
+        root.addView(sectionLabel("POWER SUPPLY"))
+
+        val powerCard = infoCard(
+            title = "⚡ External Power",
+            value = if (power.isExternalPowerConnected) {
+                "Connected"
+            } else {
+                "Disconnected"
+            },
+            detail = if (power.isCharging) {
+                "Phone is receiving power"
+            } else {
+                "Phone is not charging"
+            }
+        )
+
+        root.addView(
+            powerCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = 28
+            }
+        )
+
+        val startButton = actionButton(
+            text = "▶  Start Monitoring",
+            backgroundColor = Color.rgb(46, 125, 50)
+        ) {
+            val intent = Intent(
+                this@MainActivity,
+                AlarmService::class.java
+            )
+
+            ContextCompat.startForegroundService(
+                this@MainActivity,
+                intent
+            )
+
+            updateMonitoringStatus()
+        }
+
+        root.addView(
+            startButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                60.dp()
+            ).apply {
+                bottomMargin = 12
+            }
+        )
+
+        val stopButton = actionButton(
+            text = "■  Stop Monitoring",
+            backgroundColor = Color.rgb(198, 40, 40)
+        ) {
+            AlarmService.stopMonitoring(this@MainActivity)
+            updateMonitoringStatus()
+        }
+
+        root.addView(
+            stopButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                60.dp()
+            ).apply {
+                bottomMargin = 12
+            }
+        )
+
+        val settingsButton = actionButton(
+            text = "⚙  Settings",
+            backgroundColor = Color.rgb(94, 53, 177)
+        ) {
+            startActivity(
+                Intent(
                     this@MainActivity,
-                    AlarmService::class.java
+                    SettingsActivity::class.java
                 )
+            )
+        }
 
-                ContextCompat.startForegroundService(
-                    this@MainActivity,
-                    intent
-                )
-
-                updateMonitoringStatus()
-            }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Stop Monitoring"
-
-            setOnClickListener {
-                AlarmService.stopMonitoring(
-                    this@MainActivity
-                )
-
-                updateMonitoringStatus()
-            }
-        })
-
-        root.addView(Button(this).apply {
-            text = "Settings"
-
-            setOnClickListener {
-                startActivity(
-                    Intent(
-                        this@MainActivity,
-                        SettingsActivity::class.java
-                    )
-                )
-            }
-        })
+        root.addView(
+            settingsButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                60.dp()
+            )
+        )
 
         setContentView(root)
     }
@@ -129,11 +235,111 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateMonitoringStatus() {
-        monitoringStatusText.text = if (AlarmService.isMonitoring) {
-            "Monitoring: ON"
+        val monitoring = AlarmService.isMonitoring
+
+        monitoringStatusText.text = if (monitoring) {
+            "●  Monitoring is ON"
         } else {
-            "Monitoring: OFF"
+            "○  Monitoring is OFF"
         }
+
+        monitoringStatusText.setTextColor(
+            if (monitoring) {
+                Color.rgb(46, 125, 50)
+            } else {
+                Color.rgb(117, 117, 117)
+            }
+        )
+
+        monitoringCard.background = roundedBackground(
+            if (monitoring) {
+                Color.rgb(232, 245, 233)
+            } else {
+                Color.rgb(238, 240, 244)
+            },
+            24f
+        )
+    }
+
+    private fun sectionLabel(text: String): TextView {
+        return TextView(this).apply {
+            this.text = text
+            textSize = 13f
+            setTextColor(Color.rgb(90, 100, 115))
+            setPadding(8, 0, 8, 10)
+        }
+    }
+
+    private fun infoCard(
+        title: String,
+        value: String,
+        detail: String
+    ): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 20, 24, 20)
+            background = roundedBackground(
+                Color.WHITE,
+                24f
+            )
+
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                textSize = 17f
+                setTextColor(Color.rgb(55, 65, 81))
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = value
+                textSize = 28f
+                setTextColor(Color.rgb(25, 103, 210))
+                setPadding(0, 8, 0, 4)
+            })
+
+            addView(TextView(this@MainActivity).apply {
+                text = detail
+                textSize = 15f
+                setTextColor(Color.rgb(100, 110, 125))
+            })
+        }
+    }
+
+    private fun actionButton(
+        text: String,
+        backgroundColor: Int,
+        onClick: () -> Unit
+    ): Button {
+        return Button(this).apply {
+            this.text = text
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            isAllCaps = false
+            background = roundedBackground(
+                backgroundColor,
+                18f
+            )
+            setOnClickListener {
+                onClick()
+            }
+        }
+    }
+
+    private fun roundedBackground(
+        color: Int,
+        radiusDp: Float
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radiusDp.dp()
+        }
+    }
+
+    private fun Float.dp(): Float {
+        return this * resources.displayMetrics.density
+    }
+
+    private fun Int.dp(): Int {
+        return (this * resources.displayMetrics.density).toInt()
     }
 
     private fun requestNotificationPermission() {
