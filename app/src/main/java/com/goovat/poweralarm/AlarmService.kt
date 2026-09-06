@@ -18,12 +18,6 @@ import java.util.UUID
 
 class AlarmService : Service() {
 
-    companion object {
-        @Volatile
-        var isMonitoring: Boolean = false
-            private set
-    }
-
     private lateinit var powerMonitor: PowerMonitor
     private lateinit var batteryMonitor: BatteryMonitor
     private lateinit var settingsStore: AlarmSettingsStore
@@ -488,6 +482,10 @@ class AlarmService : Service() {
     }
 
     companion object {
+        @Volatile
+        var isMonitoring: Boolean = false
+            private set
+
         private const val TAG =
             "PowerAlarm"
 
