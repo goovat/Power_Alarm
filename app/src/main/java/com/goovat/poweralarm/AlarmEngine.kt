@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -43,13 +44,22 @@ class AlarmEngine(
     }
 
     private fun startSound() {
-        val uri = RingtoneManager.getDefaultUri(
-            RingtoneManager.TYPE_ALARM
-        ) ?: RingtoneManager.getDefaultUri(
-            RingtoneManager.TYPE_NOTIFICATION
-        ) ?: throw IllegalStateException(
-            "No alarm or notification ringtone available"
-        )
+        val settings = AlarmSettingsStore(context).load()
+
+        val selectedUri = settings.alarmSoundUri
+            ?.takeIf { it.isNotBlank() }
+            ?.let(Uri::parse)
+
+        val uri = selectedUri
+            ?: RingtoneManager.getDefaultUri(
+                RingtoneManager.TYPE_ALARM
+            )
+            ?: RingtoneManager.getDefaultUri(
+                RingtoneManager.TYPE_NOTIFICATION
+            )
+            ?: throw IllegalStateException(
+                "No alarm or notification ringtone available"
+            )
 
         mediaPlayer = MediaPlayer().apply {
             setDataSource(context, uri)

@@ -1,5 +1,9 @@
 package com.goovat.poweralarm
 
+import android.app.Activity
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
@@ -11,12 +15,20 @@ import androidx.activity.ComponentActivity
 class SettingsActivity : ComponentActivity() {
 
     private lateinit var settingsStore: AlarmSettingsStore
+    private var selectedAlarmSoundUri: String? = null
+    private lateinit var alarmSoundButton: Button
+
+    companion object {
+        private const val REQUEST_ALARM_SOUND = 3001
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         settingsStore = AlarmSettingsStore(this)
         val settings = settingsStore.load()
+
+        selectedAlarmSoundUri = settings.alarmSoundUri
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -61,6 +73,18 @@ class SettingsActivity : ComponentActivity() {
         root.addView(fullEnabled)
         root.addView(fullThreshold)
 
+        root.addView(sectionTitle("Alarm"))
+
+        alarmSoundButton = Button(this).apply {
+            text = alarmSoundLabel(selectedAlarmSoundUri)
+
+            setOnClickListener {
+                openAlarmSoundPicker()
+            }
+        }
+
+        root.addView(alarmSoundButton)
+
         root.addView(sectionTitle("Power"))
 
         val powerOffEnabled = checkBox(
@@ -93,6 +117,7 @@ class SettingsActivity : ComponentActivity() {
             text = "Save Settings"
             setOnClickListener {
                 val updated = AlarmSettings(
+                    alarmSoundUri = selectedAlarmSoundUri,
                     lowBatteryEnabled = lowEnabled.isChecked,
                     lowBatteryThreshold = readThreshold(lowThreshold),
                     criticalBatteryEnabled = criticalEnabled.isChecked,
@@ -111,6 +136,82 @@ class SettingsActivity : ComponentActivity() {
         })
 
         setContentView(root)
+    }
+
+    private fun openAlarmSoundPicker() {
+        val intent = Intent(
+            RingtoneManager.ACTION_RINGTONE_PICKER
+        ).apply {
+            putExtra(
+                RingtoneManager.EXTRA_RINGTONE_TYPE,
+                RingtoneManager.TYPE_ALARM
+            )
+
+            putExtra(
+                RingtoneManager.EXTRA_RINGTONE_TITLE,
+                "Select alarm sound"
+            )
+
+            selectedAlarmSoundUri
+                ?.takeIf { it.isNotBlank() }
+                ?.let {
+                    putExtra(
+                        RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                        Uri.parse(it)
+                    )
+                }
+        }
+
+        startActivityForResult(
+            intent,
+            REQUEST_ALARM_SOUND
+        )
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
+
+        if (
+            requestCode == REQUEST_ALARM_SOUND &&
+            resultCode == Activity.RESULT_OK
+        ) {
+            val uri = data?.getParcelableExtra<Uri>(
+                RingtoneManager.EXTRA_RINGTONE_PICKED_URI
+            )
+
+            selectedAlarmSoundUri = uri?.toString()
+
+            alarmSoundButton.text =
+                alarmSoundLabel(selectedAlarmSoundUri)
+        }
+    }
+
+    private fun alarmSoundLabel(uriString: String?): String {
+        if (uriString.isNullOrBlank()) {
+            return "Alarm sound: System default"
+        }
+
+        val ringtone = RingtoneManager.getRingtone(
+            this,
+            Uri.parse(uriString)
+        )
+
+        val title = ringtone?.getTitle(this)
+
+        return if (title.isNullOrBlank()) {
+            "Alarm sound: Selected"
+        } else {
+            "Alarm sound: $title"
+        }
     }
 
     private fun sectionTitle(title: String): TextView {

@@ -3,6 +3,7 @@ package com.goovat.poweralarm
 import android.content.Context
 
 data class AlarmSettings(
+    val alarmSoundUri: String? = null,
     val lowBatteryEnabled: Boolean = true,
     val lowBatteryThreshold: Int = 20,
     val criticalBatteryEnabled: Boolean = true,
@@ -24,6 +25,10 @@ class AlarmSettingsStore(context: Context) {
 
     fun load(): AlarmSettings {
         return AlarmSettings(
+            alarmSoundUri = preferences.getString(
+                KEY_ALARM_SOUND_URI,
+                null
+            ),
             lowBatteryEnabled = preferences.getBoolean(
                 KEY_LOW_ENABLED,
                 true
@@ -69,6 +74,7 @@ class AlarmSettingsStore(context: Context) {
 
     fun save(settings: AlarmSettings) {
         preferences.edit()
+            .putString(KEY_ALARM_SOUND_URI, settings.alarmSoundUri)
             .putBoolean(KEY_LOW_ENABLED, settings.lowBatteryEnabled)
             .putInt(KEY_LOW_THRESHOLD, settings.lowBatteryThreshold.coerceIn(1, 100))
             .putBoolean(KEY_CRITICAL_ENABLED, settings.criticalBatteryEnabled)
@@ -83,6 +89,7 @@ class AlarmSettingsStore(context: Context) {
     }
 
     companion object {
+        private const val KEY_ALARM_SOUND_URI = "alarm_sound_uri"
         private const val KEY_LOW_ENABLED = "low_battery_enabled"
         private const val KEY_LOW_THRESHOLD = "low_battery_threshold"
         private const val KEY_CRITICAL_ENABLED = "critical_battery_enabled"
