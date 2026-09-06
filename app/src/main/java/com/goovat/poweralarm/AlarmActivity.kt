@@ -48,6 +48,7 @@ class AlarmActivity : FragmentActivity() {
             alarmSessionToken = newToken
             authenticationStarted = false
             authenticationCompleted = false
+            authenticate()
         }
     }
 

@@ -175,6 +175,7 @@ class AlarmService : Service() {
             .setPriority(Notification.PRIORITY_MAX)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setContentIntent(pendingIntent)
             .setFullScreenIntent(
                 pendingIntent,
                 true
